@@ -10,13 +10,10 @@
 - Added `load_pretrained_weights` to copy a pretrained linear layer's weight and, when present, its bias into the layer.
 - Introduced `LoRALinearLayer` as an `nn.Linear` subclass. It accepts the standard linear-layer dimensions and bias option, as well as LoRA configuration options.
 - Froze the base linear layer's weight so it is excluded from gradient updates.
-- Added trainable `lora_A` and `lora_B` parameters with dimensions `in_features × rank` and `rank × out_features`, respectively. Both tensors are created from zeros; the code then attempts to initialize `lora_A` with Kaiming uniform initialization, while `lora_B` remains zero-initialized.
+- Added trainable `lora_A` and `lora_B` parameters with dimensions `in_features × rank` and `rank × out_features`, respectively. `lora_A` is initialized with Kaiming uniform initialization, while `lora_B` remains zero-initialized.
+- Implemented `LoRALinearLayer.forward` to compute the frozen linear layer output, apply dropout to the input for the adapter path, transform it with the low-rank A/B matrices and scaling factor, and add the adapter output to the base output.
+- Imported PyTorch's neural-network functional API for the base linear operation in the forward pass.
 
 ### Current scope
 
-- This remains an implementation scaffold: the adapter matrices are not yet used to compute or add a LoRA update in a `forward` method. The base-layer bias, when enabled, is not frozen.
-
-### Known issues
-
-- LoRA configuration initialization is currently broken: `LoRALayerBase` assigns `self.lora_alpha` to itself instead of using the `lora_alpha` argument, and `LoRALinearLayer` calls the base constructor as `LoRALayerBase(self, ...)` rather than invoking its initializer.
-- The Kaiming initialization call uses `nn.init.kaiming_uniform`; PyTorch's initializer is named `nn.init.kaiming_uniform_`.
+- The base linear layer's bias remains trainable when enabled; only its weight is frozen.

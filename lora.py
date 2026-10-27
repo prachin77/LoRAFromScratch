@@ -1,7 +1,7 @@
 import math
 import torch
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 from dataclasses import dataclass
 from typing import Optional , Literal , Union
 from safetensors.torch import save_file
@@ -15,7 +15,7 @@ class LoRALayerBase:
         # use Huggingface lib more settings to tweak or configure with 
 
         self.rank = rank
-        self.lora_alpha = self.lora_alpha
+        self.lora_alpha = lora_alpha
         # if we don't want dropout then takes the input only
         self.lora_dropout = nn.Dropout(lora_dropout) if lora_dropout > 0 else lambda x : x
         self.use_rslora = use_rslora
@@ -47,7 +47,7 @@ class LoRALinearLayer(nn.Linear , LoRALayerBase):
 
         # initialize this layer so that we can resue all the methods of this layer
         # from within lora linear layer also.
-        LoRALayerBase(self , rank = rank , lora_alpha = lora_alpha , lora_dropout = lora_dropout , use_rslora=use_rslora)
+        LoRALayerBase.__init__(self , rank = rank , lora_alpha = lora_alpha , lora_dropout = lora_dropout , use_rslora=use_rslora)
 
         # freeze weights of original layer and train new A and B matrices .
         # linear layer also has a bias , but training a bias/bias layer is optional.
@@ -63,8 +63,23 @@ class LoRALinearLayer(nn.Linear , LoRALayerBase):
 
         # in paper they initialized lora_A with gaussian distribution
         # but in implementation they used kaiming_uniform . idk why ?
-        nn.init.kaiming_uniform(self.lora_A , a = math.sqrt(5))
+        nn.init.kaiming_uniform_(self.lora_A , a = math.sqrt(5))
 
+    def forward(self , x):
+        # the actual logic 
+
+        # the layer whose weights are being freezed 
+        org_layer_out = F.linear(x , self.weight , bias = self.bias)
+
+        # the compressed layer 
+        lora_mult = (self.lora_A @ self.lora_B) * self.scaling
+        # we applied dropout just to reduce overfitting
+        low_rank_out = self.lora_dropout(x) @ lora_mult
+
+        output = org_layer_out + low_rank_out
+
+        return output 
+        
     
 
 if __name__ == "__main__":
