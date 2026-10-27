@@ -49,6 +49,22 @@ class LoRALinearLayer(nn.Linear , LoRALayerBase):
         # from within lora linear layer also.
         LoRALayerBase(self , rank = rank , lora_alpha = lora_alpha , lora_dropout = lora_dropout , use_rslora=use_rslora)
 
+        # freeze weights of original layer and train new A and B matrices .
+        # linear layer also has a bias , but training a bias/bias layer is optional.
+        # we can toggle its implementation later .
+        self.weight.requires_grad = False # ---> Turns off the weight layer and we don't do any gradient updates
+
+        # we can train A & B matrices 2 ways :
+        # 1. we can have 2 linear layers and no biases 
+        # 2. we can have/create 2 matrices and pass them as paramters ans train them
+        # we'll go the easy way!!!!!!!! 😂 -> way 2
+        self.lora_A = nn.Parameter(torch.zeros(in_features , rank))
+        self.lora_B = nn.Parameter(torch.zeros(rank , out_features))
+
+        # in paper they initialized lora_A with gaussian distribution
+        # but in implementation they used kaiming_uniform . idk why ?
+        nn.init.kaiming_uniform(self.lora_A , a = math.sqrt(5))
+
     
 
 if __name__ == "__main__":
