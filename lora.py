@@ -65,10 +65,30 @@ class LoRALinearLayer(nn.Linear , LoRALayerBase):
         # but in implementation they used kaiming_uniform . idk why ?
         nn.init.kaiming_uniform_(self.lora_A , a = math.sqrt(5))
 
+    def _merge_weights(self):
+        # self.weight.data -> matrix(output , input) , because pytorch does the transpose
+        # (self.lora_A @ self.lora_B) -> because we're doing it manually i just need to make sure   
+        merged_weights = self.weight.data + self.scaling * (self.lora_A @ self.lora_B).T
+
+        # create a new linear layer that uses W' the new matrix
+        state_dict = {"weight" : merged_weights}
+        if self.bias is not None:
+            # if there's a bias in this layer then we can go ahead
+            state_dict["bias"] = self.bias
+
+            merged_linear = nn.Linear(self.in_features , self.out_features , bias=True if self.bias is not None else False)
+
+            # merge our merged_weights and bias to this linear layer 
+            merged_linear.load_state_dict(state_dict)
+
+            return merged_linear
+
     def forward(self , x):
         # the actual logic 
 
         # the layer whose weights are being freezed 
+        # we're using F.linear because it takes care of this multiplication . 
+        # we used this just so that manual multiplication can be avoided
         org_layer_out = F.linear(x , self.weight , bias = self.bias)
 
         # the compressed layer 
@@ -83,8 +103,12 @@ class LoRALinearLayer(nn.Linear , LoRALayerBase):
     
 
 if __name__ == "__main__":
-    layer = LoRALinearLayer(4 , 4)
+    layer = LoRALinearLayer(4 , 4 , rank = 2)
+    rand = torch.rand(4,4)
     print(layer)
+
+    output = layer(rand)
+    print(output)
 
 
         
