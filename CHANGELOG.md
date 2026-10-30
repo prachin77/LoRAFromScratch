@@ -17,3 +17,25 @@
 ### Current scope
 
 - The base linear layer's bias remains trainable when enabled; only its weight is frozen.
+
+## 2026-10-28
+
+### Added
+
+- Added `_merge_weights` to combine the frozen linear weight with the scaled LoRA update and load the merged parameters into a standard `nn.Linear` layer.
+- Updated the script example to instantiate the adapter with rank 2, run a random input through its forward pass, and print the output.
+
+### Known limitation
+
+- `_merge_weights` currently creates and returns the merged layer only when the original layer has a bias. For a bias-free layer, the method returns `None`.
+
+## 2026-10-30
+
+### Added
+
+- Added `LoRAEmbedding`, which freezes the base embedding weights and adds a trainable low-rank adapter to embedding outputs.
+
+### Changed
+
+- Initialized `LoRALinearLayer.lora_B` with Kaiming uniform values instead of zeros.
+- Updated the script example to instantiate a `LoRAEmbedding` layer.

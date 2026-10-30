@@ -64,6 +64,7 @@ class LoRALinearLayer(nn.Linear , LoRALayerBase):
         # in paper they initialized lora_A with gaussian distribution
         # but in implementation they used kaiming_uniform . idk why ?
         nn.init.kaiming_uniform_(self.lora_A , a = math.sqrt(5))
+        nn.init.kaiming_uniform_(self.lora_B , a = math.sqrt(5))
 
     def _merge_weights(self):
         # self.weight.data -> matrix(output , input) , because pytorch does the transpose
@@ -100,15 +101,57 @@ class LoRALinearLayer(nn.Linear , LoRALayerBase):
 
         return output 
         
-    
+class LoRAEmbedding(nn.Embedding , LoRALayerBase):
+    # its just a wrapper on nn.Embedding layer and LoRALayerBase
 
+    # mostly embedding layers are frozen and not trained . but 
+    # here we'll create a seperate lora embedding layer and 
+    # potentially train it .
+
+    def __init__(self , num_embeddings , embedding_dim , rank = 8 , lora_alpha = 8 , lora_dropout = 0.0 , use_rslora = True , **kwargs):
+        # num_embeddings = vocab size , how many possible words do i've in my tokenizer
+        # embedding_dim = how many numbers will i use to represent every single word 
+
+        # initialize inherited classes
+        nn.Embedding.__init__(self , num_embeddings , embedding_dim , **kwargs)
+        LoRALayerBase.__init__(self , rank=rank , lora_alpha=lora_alpha , lora_dropout=lora_dropout , use_rslora=use_rslora)
+
+        # we don't need to compute gradients on the original embedding 
+        self.weight.requires_grad = False
+
+        self.lora_A = nn.Parameter(torch.zeros(num_embeddings , rank))
+        self.lora_B = nn.Parameter(torch.zeros(rank , embedding_dim))
+
+        nn.init.kaiming_uniform_(self.lora_A , a = math.sqrt(5))
+
+    def forward(self , x):
+        # linear layer has dropout here we don't have that because here we're using raw inputs 
+        # i.e. x
+        org_layer_out = F.embedding(input=x , weight=self.weight , padding_idx=self.padding_idx , max_norm=self.max_norm , norm_type=self.norm_type , scale_grad_by_freq=self.scale_grad_by_freq , sparse=self.sparse)
+        low_rank_A_output = F.embedding(input=x , weight=self.lora_A , padding_idx=self.padding_idx , max_norm=self.max_norm , norm_type=self.norm_type , scale_grad_by_freq=self.scale_grad_by_freq , sparse=self.sparse)
+        low_rank_output = (low_rank_A_output @ self.lora_B) * self.scaling
+        output = org_layer_out + low_rank_output
+
+        return output 
+        
+ 
 if __name__ == "__main__":
-    layer = LoRALinearLayer(4 , 4 , rank = 2)
-    rand = torch.rand(4,4)
-    print(layer)
+    # whether or not we do LoRA operation or we merge the weights 
+    # and just do regular linear linear layer we get the same result .
 
-    output = layer(rand)
-    print(output)
+    layer = LoRAEmbedding(200 , 64 , rank = 2)
+    # rand = torch.rand(4,4)
+    # print(layer)
+
+    # output = layer(rand)
+    # print(output)
+
+    # when we do weight merging the new linear layer that we get from 
+    # weight merging should have exactly same dim as the layer before
+    # doing weight merging . 
+    # merged = layer._merge_weights()
+    # output2 = merged(rand)
+    # print(output2)
 
 
         
