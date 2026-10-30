@@ -33,7 +33,7 @@
 
 ### Added
 
-- Added `LoRAEmbedding`, which freezes the base embedding weights and adds a trainable low-rank adapter to embedding outputs.
+- Completed `LoRAEmbedding`, including a frozen base embedding, a trainable low-rank adapter in the forward pass, and `_merge_weights` to combine the adapter with the base weights in a standard `nn.Embedding`.
 
 ### Changed
 

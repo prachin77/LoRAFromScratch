@@ -124,9 +124,21 @@ class LoRAEmbedding(nn.Embedding , LoRALayerBase):
 
         nn.init.kaiming_uniform_(self.lora_A , a = math.sqrt(5))
 
+    def _merge_weights(self):
+        merged_weights = self.weight.data + self.scaling * (self.lora_A @ self.lora_B)
+
+        # embedding layer don't have bias . just weight
+        state_dict = {"weight" : merged_weights}
+
+        merged_emb = nn.Embedding(self.num_embeddings , self.embedding_dim)
+        merged_emb.load_state_dict(state_dict)
+
+        return merged_emb
+
     def forward(self , x):
         # linear layer has dropout here we don't have that because here we're using raw inputs 
-        # i.e. x
+        # i.e. x which are coming out of the tokenizer . so that is not something we'll apply 
+        # dropout to.
         org_layer_out = F.embedding(input=x , weight=self.weight , padding_idx=self.padding_idx , max_norm=self.max_norm , norm_type=self.norm_type , scale_grad_by_freq=self.scale_grad_by_freq , sparse=self.sparse)
         low_rank_A_output = F.embedding(input=x , weight=self.lora_A , padding_idx=self.padding_idx , max_norm=self.max_norm , norm_type=self.norm_type , scale_grad_by_freq=self.scale_grad_by_freq , sparse=self.sparse)
         low_rank_output = (low_rank_A_output @ self.lora_B) * self.scaling
